@@ -25,14 +25,17 @@ import org.jsoup.select.Elements;
 //代理ip池
 public class AgeIppool
 {
-    //三个网址轮流爬取
+    //四个网址轮流爬取
     String[] urlarray = new String[]{"http://www.66ip.cn/",
             "http://www.66ip.cn/areaindex_1/1.html",
             "http://www.66ip.cn/areaindex_2/1.html",
             "http://www.66ip.cn/areaindex_3/1.html"};
-    private ArrayBlockingQueue<AgIp> ippool = new ArrayBlockingQueue<AgIp>(10);
+    //装初始ip的队列容器
+    private ArrayBlockingQueue<AgIp> ipPool = new ArrayBlockingQueue<AgIp>(20);
+    //用来返还ip的队列容器
+    public ArrayBlockingQueue<AgIp> returnIpPool = new ArrayBlockingQueue<AgIp>(20);
     //用传递进来的线程池跑多线程
-    ThreadPoolExecutor thpool=null;
+    ThreadPoolExecutor thPool=null;
     //控制ip池大小
     int size=0;
     //计数控制爬取ip的网站
@@ -46,15 +49,14 @@ public class AgeIppool
 
     public AgeIppool(int size, ThreadPoolExecutor thpool)
     {
-        this.thpool=thpool;
+        this.thPool=thpool;
         this.size=size;
-        init();
     }
 
-    public void init()
+    public ArrayBlockingQueue<AgIp> init()
     {
 
-        thpool.execute(new Runnable()
+        thPool.execute(new Runnable()
         {
 
             @Override
@@ -138,7 +140,7 @@ public class AgeIppool
                                     {
                                         System.out.println("爬取一个ip放入池中");
                                         System.out.println("地址为  "+addresstemp+" ||| "+et.text());
-                                        ippool.put(new AgIp(addresstemp, Integer.parseInt(et.text())));
+                                        ipPool.put(new AgIp(addresstemp, Integer.parseInt(et.text())));
                                     } catch (NumberFormatException | InterruptedException e1)
                                     {
                                         // TODO Auto-generated catch block
@@ -197,17 +199,23 @@ public class AgeIppool
 
             }
         });
+
+        return returnIpPool;
     }
 
     //获取ip
-    public  AgIp getip() throws IOException
+    public  void getIp() throws IOException
     {
-        AgIp ip=null;
 
-        aaa:
-        while(true)
+        thPool.execute(new Runnable()
         {
-            //没必要加这段，因为本身ippool使block的，而且加了这段会死锁
+
+            @Override
+            public void run()
+            {
+                while(true)
+                {
+                    //没必要加这段，因为本身ippool使block的，而且加了这段会死锁
             /*
 			while(ippool.isEmpty())
 			{
@@ -222,102 +230,106 @@ public class AgeIppool
 			}
              */
 
-            AgIp iptemp = null;
-            try
-            {
-                iptemp = ippool.take();
-            } catch (InterruptedException e1) {
-                // TODO Auto-generated catch block
-                e1.printStackTrace();
-            }
-            System.out.println("验证ip");
-            System.out.println(iptemp.getaddress() + " ||| " + iptemp.getport());
+                    AgIp ipTemp = null;
+                    try
+                    {
+                        ipTemp = ipPool.take();
+                    } catch (InterruptedException e1)
+                    {
+                        // TODO Auto-generated catch block
+                        e1.printStackTrace();
+                    }
+                    System.out.println("验证ip");
+                    System.out.println(ipTemp.getaddress() + " --- " + ipTemp.getport());
 
-            //如果访问百度没问题则判定该代理ip存活
-            //每个返回的ip都保证是存活的
-            String baiduurl = "https://www.baidu.com";
-            URL baiduaddress;
-            //百度html第一行
-            String verify = "<!DOCTYPE html><!--STATUS OK-->";
+                    //如果访问百度没问题则判定该代理ip存活
+                    //每个返回的ip都保证是存活的
+                    String baiduurl = "https://www.baidu.com";
+                    URL baiduaddress;
+                    //百度html第一行
+                    String verify = "<!DOCTYPE html><!--STATUS OK-->";
 
-            InputStream input = null;
-            InputStreamReader inread = null;
-            BufferedReader inbread = null;
-            HttpURLConnection uconnect = null;
-            try
-            {
-                Proxy p = new Proxy(Proxy.Type.HTTP, new InetSocketAddress(iptemp.getaddress(), iptemp.getport()));
-                baiduaddress = new URL(new URI(baiduurl).toASCIIString());
-                uconnect = (HttpURLConnection) baiduaddress.openConnection(p);
-                uconnect.setRequestProperty("User-Agent", "Mozilla/5.0 (compatible; MSIE 7.0; "
-                        + "Windows NT 6.1; Maxthon;)");
-                //6秒超时
-                uconnect.setConnectTimeout(6000);
+                    InputStream input = null;
+                    InputStreamReader inread = null;
+                    BufferedReader inbread = null;
+                    HttpURLConnection uconnect = null;
+                    try
+                    {
+                        Proxy p = new Proxy(Proxy.Type.HTTP, new InetSocketAddress(ipTemp.getaddress(), ipTemp.getport()));
+                        baiduaddress = new URL(new URI(baiduurl).toASCIIString());
+                        uconnect = (HttpURLConnection) baiduaddress.openConnection(p);
+                        uconnect.setRequestProperty("User-Agent", "Mozilla/5.0 (compatible; MSIE 7.0; "
+                                + "Windows NT 6.1; Maxthon;)");
+                        //6秒超时
+                        uconnect.setConnectTimeout(6000);
 
-                input = uconnect.getInputStream();
-                inread = new InputStreamReader(input, "utf-8");
-                inbread = new BufferedReader(inread);
+                        input = uconnect.getInputStream();
+                        inread = new InputStreamReader(input, "utf-8");
+                        inbread = new BufferedReader(inread);
 
-                //按行读取html
-                String temp = inbread.readLine();
-                if (temp.equals(verify))
-                {
-                    ip = iptemp;
-                    input.close();
-                    inread.close();
-                    inbread.close();
-                    break aaa;
+                        //按行读取html
+                        String temp = inbread.readLine();
+                        //判断是否和百度页面相同
+                        if (temp.equals(verify))
+                        {
+                            //放入返回容器列表
+                            returnIpPool.add(ipTemp);
+                            input.close();
+                            inread.close();
+                            inbread.close();
+                        }else
+                        {
+                            System.out.println("存活失败,开始检验下一个代理ip");
+                        }
+
+                    } catch (MalformedURLException | URISyntaxException e)
+                    {
+                        // TODO Auto-generated catch block
+                        e.printStackTrace();
+                    } catch (IOException e)
+                    {
+                        // TODO Auto-generated catch block
+                        e.printStackTrace();
+                    } finally
+                    {
+                        //释放资源
+                        if(uconnect!=null)
+                            try
+                            {
+                                uconnect.disconnect();
+                            } catch (Exception e)
+                            {
+                                e.printStackTrace();
+                            }
+                        if(input!=null)
+                            try
+                            {
+                                input.close();
+                            } catch (IOException e)
+                            {
+                                e.printStackTrace();
+                            }
+                        if(inread!=null)
+                            try
+                            {
+                                inread.close();
+                            } catch (IOException e)
+                            {
+                                e.printStackTrace();
+                            }
+                        if(inbread!=null)
+                            try
+                            {
+                                inbread.close();
+                            } catch (IOException e)
+                            {
+                                e.printStackTrace();
+                            }
+                    }
                 }
-
-            } catch (MalformedURLException | URISyntaxException e)
-            {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
-            } catch (IOException e)
-            {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
-            } finally
-            {
-                //释放资源
-                if(uconnect!=null)
-                    try
-                    {
-                        uconnect.disconnect();
-                    } catch (Exception e)
-                    {
-                        e.printStackTrace();
-                    }
-                if(input!=null)
-                    try
-                    {
-                        input.close();
-                    } catch (IOException e)
-                    {
-                        e.printStackTrace();
-                    }
-                if(inread!=null)
-                    try
-                    {
-                        inread.close();
-                    } catch (IOException e)
-                    {
-                        e.printStackTrace();
-                    }
-                if(inbread!=null)
-                    try
-                    {
-                        inbread.close();
-                    } catch (IOException e)
-                    {
-                        e.printStackTrace();
-                    }
             }
+        });
 
-            System.out.println("存活失败,开始检验下一个代理ip");
-        }
-
-        return ip;
     }
 }
 
