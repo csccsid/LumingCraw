@@ -232,7 +232,7 @@ public class crawContent
             for(Element et:es)
             {
                 Episode etemp = new Episode();
-                etemp.setlink(bookUrl+et.attr("href"));
+                etemp.setLink(bookUrl+et.attr("href"));
                 etemp.setepisodetitle(et.text());
                 urlQueue.add(etemp);
 

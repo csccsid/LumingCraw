@@ -3,14 +3,15 @@ package org.example.util;
 //章节的实体类
 public class Episode
 {
-    private String link=null;
-    private String title=null;
+    private String link = null;
+    private String title = null;
+    private String substance = null;
 
     public Episode()
     {
     }
 
-    public synchronized void setlink(String link)
+    public synchronized void setLink(String link)
     {
         this.link=link;
     }
@@ -20,7 +21,9 @@ public class Episode
         this.title=title;
     }
 
-    public String getlink()
+    public void setSubstance(String substance){ this.substance = substance; }
+
+    public String getLink()
     {
         return link;
     }
@@ -28,5 +31,10 @@ public class Episode
     public String getepisodetitle()
     {
         return title;
+    }
+
+    public String getSubstance()
+    {
+        return  substance;
     }
 }

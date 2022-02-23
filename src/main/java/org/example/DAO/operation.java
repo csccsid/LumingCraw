@@ -39,7 +39,7 @@ public class operation implements DAO
     }
 
     @Override
-    public void insertContent(Episode episode)
+    public void  insertContent(Book book, Episode episode)
     {
     }
 }

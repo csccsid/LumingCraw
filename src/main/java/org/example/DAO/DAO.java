@@ -24,5 +24,5 @@ public interface DAO
     public void insertBookList(Book book);
 
     //在新书中插入章节内容
-    public void insertContent(Episode episode);
+    public void insertContent(Book book, Episode episode);
 }

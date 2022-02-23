@@ -49,7 +49,8 @@ public class controller
                 crawContent cC = new crawContent();
                 String bookUrl = cC.getSource(bookName);
 
-                if (bookUrl != null) {
+                if (bookUrl != null)
+                {
                     //获取id
                     String lastId = op.getLastBookId();
                     String bookId = "b" + (Integer.parseInt(lastId.substring(1)) + 1);
@@ -67,7 +68,8 @@ public class controller
                     bookContent = cC.getContent(bookUrl, scp);
 
                     //爬取章节内容
-                    crawEpisode cEpisode = new crawEpisode(bookContent, thPool, returnIpPool);
+                    crawEpisode cEpisode = new crawEpisode(bookContent, thPool,
+                            returnIpPool, scp, book);
                     cEpisode.crawLauch();
                 }
             }
